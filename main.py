@@ -15,6 +15,8 @@ def scrape_fantacalcio_formations(team_name_full):
     """
     Scrapes probable formations for a single team from Fantacalcio.it.
     Returns a dictionary with team, module, players, and source.
+    NOTE: Fantacalcio.it's 'probable formations' pages typically only provide
+    player names and not detailed info like specific role, age, nationality.
     """
     try:
         # Prepara il nome della squadra per l'URL di Fantacalcio.it
@@ -59,17 +61,12 @@ def scrape_tmw_serie_a_news():
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Seleziona i principali elementi delle notizie. Questo selettore potrebbe aver bisogno di aggiustamenti
-        # se la struttura del sito di TMW cambia.
-        # Cercare un div o una lista che contiene le notizie, poi gli <a> tag all'interno.
-        # Esempio: elementi <div> con classe 'news-item' o una struttura simile.
-        # Per TMW, spesso le notizie sono all'interno di <div class="tmw-list">, o <article>
-        # Proviamo a selezionare i link delle notizie principali nella sezione Serie A.
-        news_elements = soup.select('.tmw-list a[href*="/news/serie-a/"]') # Cerca link con 'news/serie-a/'
+        # Seleziona gli elementi delle notizie dalla lista principale di TMW
+        news_elements = soup.select('.tmw-list article .h-item a') # Aggiornato per catturare i link negli articoli
         
-        # Prende solo i primi 5-7 titoli per evitare una lista troppo lunga
+        # Prende solo i primi 7-10 titoli per evitare una lista troppo lunga
         for i, news_item in enumerate(news_elements):
-            if i >= 7: # Limita a 7 notizie
+            if i >= 10: # Limita a 10 notizie
                 break
             title = news_item.get_text(strip=True)
             link = news_item['href']
@@ -77,7 +74,7 @@ def scrape_tmw_serie_a_news():
             if not link.startswith('http'):
                 link = f"https://www.tuttomercatoweb.com{link}"
             
-            if title and link:
+            if title and link and "video" not in link: # Filtra i link che potrebbero essere video
                 news_items.append({"title": title, "link": link})
         
         print(f"Notizie raccolte da TuttoMercatoWeb.com: {len(news_items)} articoli.")
@@ -161,22 +158,26 @@ for d in SCRAPED_FORMATIONS:
                     <img src="{logo_path}" alt="{d['team']} logo" class="w-10 h-10 rounded-full mr-4 border-2 border-gray-200 object-contain">
                     <h2 class="text-2xl font-semibold text-gray-700">{d['team']} — {d['modulo']}</h2>
                 </div>
-                <ul class="list-disc list-inside text-gray-600 space-y-2">
+                <ul class="list-none space-y-2"> {/* Changed to list-none for custom styling */}
     """
     # Aggiunge i giocatori alla lista all'interno della card della squadra
     if d['players']:
         for p in d["players"]:
+            # Visualizzazione migliorata per ogni giocatore (stile mini-card)
             html += f"""
-                        <li class="flex items-center">
-                            <svg class="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                            </svg>
-                            {p}
+                        <li class="flex items-center p-2 bg-gray-50 rounded-md shadow-sm border border-gray-200">
+                            <img src="https://placehold.co/30x30/d1d5db/374151?text=⚽" alt="Player icon" class="w-8 h-8 rounded-full mr-3 border border-gray-300 object-contain">
+                            <div>
+                                <p class="font-semibold text-gray-800 text-base">{p}</p>
+                                {/* Placeholder per Ruolo, Età, Nazionalità. Questi dati NON sono scrapati da Fantacalcio.it. */}
+                                <p class="text-xs text-gray-500">Ruolo (es. Attaccante) | Età (N/D) | Nazionalità (N/D)</p>
+                                {/* <a href="#" class="text-blue-500 hover:underline text-xs">Vedi profilo</a> {/* Placeholder link */}
+                            </div>
                         </li>
             """
     else:
         html += """
-                    <li class="text-red-500">Nessun giocatore titolare trovato o errore nello scraping.</li>
+                    <li class="text-red-500 p-2 bg-gray-50 rounded-md shadow-sm border border-gray-200">Nessun giocatore titolare trovato o errore nello scraping. Le formazioni saranno aggiornate con l'avvicinarsi della stagione e del calciomercato.</li>
         """
     html += """
                 </ul>
