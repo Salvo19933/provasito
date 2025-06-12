@@ -3,11 +3,13 @@ from bs4 import BeautifulSoup
 import os
 from datetime import datetime
 
-# List of Serie A teams
+# Lista delle squadre della Serie A 2025-2026
+# Questa lista è stata aggiornata per riflettere le squadre della prossima stagione,
+# basandosi sulle informazioni disponibili a Giugno 2025.
 TEAMS = [
-    "Juventus", "Inter", "Milan", "Napoli", "Roma", "Lazio", "Atalanta",
-    "Fiorentina", "Bologna", "Torino", "Verona", "Monza", "Udinese", "Empoli",
-    "Salernitana", "Lecce", "Sassuolo", "Genoa", "Spezia", "Frosinone" # Nota: La lista delle squadre dovrebbe essere aggiornata se ci sono promozioni/retrocessioni in Serie A.
+    "Atalanta", "Bologna", "Cagliari", "Como", "Cremonese", "Fiorentina", "Genoa",
+    "Inter", "Juventus", "Lazio", "Lecce", "Milan", "Napoli", "Parma", "Pisa",
+    "Roma", "Sassuolo", "Torino", "Udinese", "Verona" # "Verona" sta per Hellas Verona nei link di Fantacalcio.it
 ]
 
 SCRAPED_DATA = [] # Lista per memorizzare i dati delle formazioni
@@ -15,14 +17,16 @@ SCRAPED_DATA = [] # Lista per memorizzare i dati delle formazioni
 print("Inizio scraping delle formazioni da Fantacalcio.it...")
 
 # --- Fonte di Scraping Primaria: Fantacalcio.it ---
-# Questo ciclo recupera le formazioni per ogni squadra dalla pagina dedicata su Fantacalcio.it
-for team in TEAMS:
+# Fantacalcio.it offre pagine dedicate per le probabili formazioni di ciascuna squadra,
+# il che lo rende una fonte relativamente stabile per lo scraping.
+for team_name_full in TEAMS:
     try:
         # Costruisce l'URL per la pagina delle probabili formazioni della squadra su Fantacalcio.it
-        # Sostituisce gli spazi con i trattini e converte in minuscolo per l'URL
-        url_team_name = team.lower().replace(' ', '-')
-        url = f"https://www.fantacalcio.it/giocatori/probabili-formazioni/serie-a/{url_team_name}"
-        print(f"Tentativo di scraping per: {team} da URL: {url}")
+        # Sostituisce gli spazi con i trattini e converte in minuscolo per l'URL.
+        # Esempio: "Hellas Verona" -> "verona" per l'URL di Fantacalcio.it
+        url_team_segment = team_name_full.lower().replace(' ', '-').replace('hellas-', '') # Gestisce Hellas Verona
+        url = f"https://www.fantacalcio.it/giocatori/probabili-formazioni/serie-a/{url_team_segment}"
+        print(f"Tentativo di scraping per: {team_name_full} da URL: {url}")
 
         r = requests.get(url)
         r.raise_for_status() # Genera un'eccezione per errori HTTP (es. 404, 500)
@@ -36,16 +40,27 @@ for team in TEAMS:
         players_elements = soup.select(".formazione__lista li.titolare")
         players = [p.text.strip() for p in players_elements]
 
-        SCRAPED_DATA.append({"team": team, "modulo": modulo, "players": players, "source": "Fantacalcio.it"})
-        print(f"Dati per {team} raccolti con successo da Fantacalcio.it.")
+        SCRAPED_DATA.append({"team": team_name_full, "modulo": modulo, "players": players, "source": "Fantacalcio.it"})
+        print(f"Dati per {team_name_full} raccolti con successo da Fantacalcio.it.")
     except requests.exceptions.RequestException as e:
-        print(f"Errore HTTP/di connessione durante lo scraping per {team} da Fantacalcio.it: {e}")
-        SCRAPED_DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
+        print(f"Errore HTTP/di connessione durante lo scraping per {team_name_full} da Fantacalcio.it: {e}")
+        SCRAPED_DATA.append({"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
     except Exception as e:
-        print(f"Si è verificato un errore inatteso durante lo scraping per {team} da Fantacalcio.it: {e}")
-        SCRAPED_DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
+        print(f"Si è verificato un errore inatteso durante lo scraping per {team_name_full} da Fantacalcio.it: {e}")
+        SCRAPED_DATA.append({"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
 
 print("Scraping da Fantacalcio.it completato.")
+
+# --- CONSIDERAZIONI SULLO SCRAPING DA ALTRE FONTI (ES. SKY SPORT) ---
+# L'integrazione di fonti come Sky Sport per "la formazione più recente" è complessa
+# perché tali siti spesso non hanno pagine aggregate e stabili con tutte le probabili formazioni.
+# Le formazioni sono solitamente incluse in articoli specifici per singole partite o eventi,
+# e la loro struttura HTML può cambiare frequentemente.
+# Per una logica "la più recente da più fonti", sarebbe necessaria:
+# 1. Una funzione di scraping specifica per ogni sito (che gestisca la loro struttura unica).
+# 2. Una logica per identificare le partite della giornata corrente.
+# 3. Una logica di consolidamento e risoluzione dei conflitti basata su timestamp o priorità.
+# Questo script si concentra su una fonte stabile (Fantacalcio.it) per garantire robustezza.
 
 
 # --- Generazione HTML ---
@@ -60,7 +75,7 @@ html = f"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Probabili Formazioni Serie A</title>
+    <title>Probabili Formazioni Serie A 2025-2026</title>
     <!-- CDN di Tailwind CSS per uno styling semplice -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts per il font Inter -->
@@ -75,7 +90,7 @@ html = f"""<!DOCTYPE html>
 <body class="p-4 bg-gray-100 flex flex-col items-center min-h-screen">
     <div class="container mx-auto max-w-4xl">
         <h1 class="text-4xl font-bold text-center text-gray-800 mb-4 rounded-lg p-4 bg-white shadow-md">
-            Probabili Formazioni Serie A
+            Probabili Formazioni Serie A 2025-2026
         </h1>
         <p class="text-center text-gray-600 text-sm mb-8">Ultimo aggiornamento: {current_datetime}</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -85,9 +100,14 @@ html = f"""<!DOCTYPE html>
 for d in SCRAPED_DATA:
     # IMPORTANTE: Sostituisci questo segnaposto con i percorsi reali dei tuoi loghi
     # Una volta che avrai la cartella 'logos' con i tuoi PNG delle squadre, usa:
-    # logo_path = f"logos/{d['team'].lower().replace(' ', '-')}.png"
-    # Per ora, usiamo un'immagine segnaposto da placehold.co
+    # Per esempio, per Juventus.png, il percorso sarebbe 'logos/juventus.png'
     logo_path = f"https://placehold.co/40x40/cbd5e1/4b5563?text={d['team'][0].upper()}" # Segnaposto con la prima lettera della squadra
+
+    # Prepara il nome della squadra per il percorso del logo (gestendo casi come "Hellas Verona" -> "verona")
+    team_for_logo_filename = d['team'].lower().replace(' ', '-').replace('hellas-', '')
+    # Se hai i tuoi loghi, decommenta la riga seguente e commenta quella sopra
+    # logo_path = f"logos/{team_for_logo_filename}.png"
+
 
     # Crea una card per ogni squadra con le classi Tailwind CSS per lo styling
     html += f"""
