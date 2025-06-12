@@ -1,52 +1,66 @@
-name: Update site every hour # Name of your workflow, visible in GitHub Actions tab
+name: Update site every hour # Nome del tuo workflow, visibile nella tab GitHub Actions
 
 on:
   schedule:
-    - cron: '0 * * * *'  # This cron expression means "at minute 0 past every hour"
-  workflow_dispatch:     # This allows you to manually trigger the workflow from the GitHub Actions tab
+    - cron: '0 * * * *'  # Questa espressione cron significa "al minuto 0 di ogni ora"
+  workflow_dispatch:     # Permette di attivare manualmente il workflow dalla tab GitHub Actions
 
 jobs:
   build:
-    runs-on: ubuntu-latest # Specifies the runner environment
+    runs-on: ubuntu-latest # Specifica l'ambiente del runner
 
     steps:
-      - name: Checkout repository # Step to clone your repository
-        uses: actions/checkout@v3 # Uses the latest recommended version of checkout action
+      - name: Checkout repository # Step per clonare la tua repository
+        uses: actions/checkout@v3 # Usa la versione 3 raccomandata dell'action checkout
         with:
-          # This token is automatically provided by GitHub and has permissions to push
+          # Questo token è fornito automaticamente da GitHub e ha i permessi per pushare
           token: ${{ secrets.GITHUB_TOKEN }} 
 
-      - name: Set up Python # Step to set up Python environment
-        uses: actions/setup-python@v4 # Uses the latest recommended version of setup-python action
+      - name: Set up Python # Step per configurare l'ambiente Python
+        uses: actions/setup-python@v4 # Usa la versione 4 raccomandata dell'action setup-python
         with:
-          python-version: '3.x' # Specifies Python 3.x
+          python-version: '3.x' # Specifica Python 3.x
 
-      - name: Install dependencies # Step to install Python libraries needed by main.py
+      - name: Install dependencies # Step per installare le librerie Python necessarie a main.py
         run: pip install requests beautifulsoup4
 
-      - name: Run Python script to generate index.html # Step to execute your Python script
+      - name: Run Python script to generate index.html # Step per eseguire il tuo script Python
         run: python main.py
 
-      - name: Configure Git # Step to configure Git user for commits
+      - name: Configure Git # Step per configurare l'utente Git per i commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "actions@github.com"
-        # The user.name and user.email are set for the bot that will commit
+        # Il user.name e user.email sono impostati per il bot che farà il commit
 
-      - name: Check for changes and commit # Step to add, commit, and check for changes
-        id: commit_check # Assigns an ID to this step to reference its outputs later
+      - name: Check for changes and commit # Step per aggiungere, commettere e verificare le modifiche
+        id: commit_step # Assegna un ID a questo step per riferire i suoi output in seguito
         run: |
-          git add index.html # Add the generated index.html to staging
-          # Check if there are any changes staged (index.html)
-          # git diff --cached --exit-code returns 0 if no changes, 1 if changes
-          # If there are changes (exit code 1), then perform the commit
-          # The '||' acts as an OR, so if the left command fails (returns 1), the right command runs
-          git diff --cached --exit-code || \
-          (git commit -m "Auto-update $(date +'%Y-%m-%d %H:%M')" && echo "::set-output name=has_changes::true") || \
-          echo "No changes to commit, skipping commit." # Message if no changes
-        shell: bash # Ensures bash is used for this multi-line command
+          git add index.html # Aggiungi l'index.html generato allo staging
+          
+          # Verifica se ci sono effettive modifiche staged prima di tentare un commit
+          # 'git diff --staged --quiet' restituisce 0 se non ci sono modifiche, 1 se ci sono
+          if git diff --staged --quiet; then
+            echo "Nessuna modifica da commettere in index.html, salta il commit e il push."
+            echo "committed=false" >> $GITHUB_OUTPUT # Imposta l'output a false usando GITHUB_OUTPUT
+          else
+            # Tenta il commit se ci sono modifiche staged
+            git commit -m "Auto-update $(date +'%Y-%m-%d %H:%M')"
+            
+            # Verifica se il comando 'git commit' è stato effettivamente riuscito
+            if [ $? -eq 0 ]; then
+              echo "Modifiche commesse con successo."
+              echo "committed=true" >> $GITHUB_OUTPUT # Imposta l'output a true usando GITHUB_OUTPUT
+            else
+              # Questo caso è raro dopo il controllo 'git diff --staged --quiet',
+              # ma lo gestiamo per robustezza.
+              echo "Errore durante il commit. Salta il push."
+              echo "committed=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+        shell: bash # Assicura che bash sia usato per questo comando multi-linea
 
-      - name: Push changes to GitHub # Step to push committed changes
-        # This step will only run if the 'commit_check' step detected changes and made a commit
-        if: steps.commit_check.outputs.has_changes == 'true'
+      - name: Push changes to GitHub # Step per pushare le modifiche commesse
+        # Questo step verrà eseguito solo se l'output 'committed' dello step 'commit_step' era 'true'
+        if: steps.commit_step.outputs.committed == 'true'
         run: git push
