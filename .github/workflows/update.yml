@@ -1,0 +1,52 @@
+name: Update site every hour # Name of your workflow, visible in GitHub Actions tab
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # This cron expression means "at minute 0 past every hour"
+  workflow_dispatch:     # This allows you to manually trigger the workflow from the GitHub Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Specifies the runner environment
+
+    steps:
+      - name: Checkout repository # Step to clone your repository
+        uses: actions/checkout@v3 # Uses the latest recommended version of checkout action
+        with:
+          # This token is automatically provided by GitHub and has permissions to push
+          token: ${{ secrets.GITHUB_TOKEN }} 
+
+      - name: Set up Python # Step to set up Python environment
+        uses: actions/setup-python@v4 # Uses the latest recommended version of setup-python action
+        with:
+          python-version: '3.x' # Specifies Python 3.x
+
+      - name: Install dependencies # Step to install Python libraries needed by main.py
+        run: pip install requests beautifulsoup4
+
+      - name: Run Python script to generate index.html # Step to execute your Python script
+        run: python main.py
+
+      - name: Configure Git # Step to configure Git user for commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+        # The user.name and user.email are set for the bot that will commit
+
+      - name: Check for changes and commit # Step to add, commit, and check for changes
+        id: commit_check # Assigns an ID to this step to reference its outputs later
+        run: |
+          git add index.html # Add the generated index.html to staging
+          # Check if there are any changes staged (index.html)
+          # git diff --cached --exit-code returns 0 if no changes, 1 if changes
+          # If there are changes (exit code 1), then perform the commit
+          # The '||' acts as an OR, so if the left command fails (returns 1), the right command runs
+          git diff --cached --exit-code || \
+          (git commit -m "Auto-update $(date +'%Y-%m-%d %H:%M')" && echo "::set-output name=has_changes::true") || \
+          echo "No changes to commit, skipping commit." # Message if no changes
+        shell: bash # Ensures bash is used for this multi-line command
+
+      - name: Push changes to GitHub # Step to push committed changes
+        # This step will only run if the 'commit_check' step detected changes and made a commit
+        if: steps.commit_check.outputs.has_changes == 'true'
+        run: git push
