@@ -1,85 +1,95 @@
 import requests
 from bs4 import BeautifulSoup
 import os
+from datetime import datetime
 
 # List of Serie A teams
 TEAMS = [
     "Juventus", "Inter", "Milan", "Napoli", "Roma", "Lazio", "Atalanta",
     "Fiorentina", "Bologna", "Torino", "Verona", "Monza", "Udinese", "Empoli",
-    "Salernitana", "Lecce", "Sassuolo", "Genoa", "Spezia", "Frosinone"
+    "Salernitana", "Lecce", "Sassuolo", "Genoa", "Spezia", "Frosinone" # Nota: La lista delle squadre dovrebbe essere aggiornata se ci sono promozioni/retrocessioni in Serie A.
 ]
 
-DATA = [] # List to store scraped data for each team
+SCRAPED_DATA = [] # Lista per memorizzare i dati delle formazioni
 
-# Loop through each team to scrape data
-print("Inizio scraping delle formazioni...")
+print("Inizio scraping delle formazioni da Fantacalcio.it...")
+
+# --- Fonte di Scraping Primaria: Fantacalcio.it ---
+# Questo ciclo recupera le formazioni per ogni squadra dalla pagina dedicata su Fantacalcio.it
 for team in TEAMS:
     try:
-        # Construct the URL for the team's probable formation page
-        # Replace spaces with hyphens and convert to lowercase for the URL
+        # Costruisce l'URL per la pagina delle probabili formazioni della squadra su Fantacalcio.it
+        # Sostituisce gli spazi con i trattini e converte in minuscolo per l'URL
         url_team_name = team.lower().replace(' ', '-')
         url = f"https://www.fantacalcio.it/giocatori/probabili-formazioni/serie-a/{url_team_name}"
-        print(f"Scraping per: {team} da URL: {url}")
+        print(f"Tentativo di scraping per: {team} da URL: {url}")
 
         r = requests.get(url)
-        r.raise_for_status() # Raise an exception for HTTP errors (e.g., 404, 500)
+        r.raise_for_status() # Genera un'eccezione per errori HTTP (es. 404, 500)
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Extract the formation module (e.g., 4-3-3)
+        # Estrae il modulo della formazione (es. 4-3-3)
         mod_element = soup.select_one(".formazioneHeader .modulo")
-        mod = mod_element.text.strip() if mod_element else "Modulo non disponibile"
+        modulo = mod_element.text.strip() if mod_element else "Modulo non disponibile"
 
-        # Extract the starting players
+        # Estrae i giocatori titolari
         players_elements = soup.select(".formazione__lista li.titolare")
         players = [p.text.strip() for p in players_elements]
 
-        DATA.append({"team": team, "modulo": mod, "players": players})
-        print(f"Dati per {team} raccolti con successo.")
+        SCRAPED_DATA.append({"team": team, "modulo": modulo, "players": players, "source": "Fantacalcio.it"})
+        print(f"Dati per {team} raccolti con successo da Fantacalcio.it.")
     except requests.exceptions.RequestException as e:
-        print(f"Errore HTTP/di connessione durante lo scraping per {team}: {e}")
-        DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"]})
+        print(f"Errore HTTP/di connessione durante lo scraping per {team} da Fantacalcio.it: {e}")
+        SCRAPED_DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
     except Exception as e:
-        print(f"Si è verificato un errore inatteso durante lo scraping per {team}: {e}")
-        DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"]})
+        print(f"Si è verificato un errore inatteso durante lo scraping per {team} da Fantacalcio.it: {e}")
+        SCRAPED_DATA.append({"team": team, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
 
-print("Scraping completato. Generazione HTML...")
+print("Scraping da Fantacalcio.it completato.")
 
-# Start HTML content with Tailwind CSS and Inter font
-# This is the main structure of your web page
+
+# --- Generazione HTML ---
+print("Generazione HTML...")
+
+# Ottiene la data e l'ora corrente per il timestamp di aggiornamento
+current_datetime = datetime.now().strftime("%d/%m/%Y %H:%M") # Formato: GG/MM/AAAA HH:MM
+
+# Inizia il contenuto HTML con Tailwind CSS e il font Inter
 html = f"""<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Probabili Formazioni Serie A</title>
-    <!-- Tailwind CSS CDN for easy styling -->
+    <!-- CDN di Tailwind CSS per uno styling semplice -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts for Inter font -->
+    <!-- Google Fonts per il font Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {{
             font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5; /* Light gray background for a clean look */
+            background-color: #f0f2f5; /* Sfondo grigio chiaro per un look pulito */
         }}
     </style>
 </head>
 <body class="p-4 bg-gray-100 flex flex-col items-center min-h-screen">
     <div class="container mx-auto max-w-4xl">
-        <h1 class="text-4xl font-bold text-center text-gray-800 mb-8 rounded-lg p-4 bg-white shadow-md">
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-4 rounded-lg p-4 bg-white shadow-md">
             Probabili Formazioni Serie A
         </h1>
+        <p class="text-center text-gray-600 text-sm mb-8">Ultimo aggiornamento: {current_datetime}</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 """
 
-# Iterate through the scraped data to generate HTML for each team card
-for d in DATA:
-    # IMPORTANT: Replace this placeholder with your actual logo paths
-    # Once you have the 'logos' folder with your team PNGs, use:
+# Itera sui dati recuperati per generare la card HTML di ogni squadra
+for d in SCRAPED_DATA:
+    # IMPORTANTE: Sostituisci questo segnaposto con i percorsi reali dei tuoi loghi
+    # Una volta che avrai la cartella 'logos' con i tuoi PNG delle squadre, usa:
     # logo_path = f"logos/{d['team'].lower().replace(' ', '-')}.png"
-    # For now, using a placeholder image from placehold.co
-    logo_path = f"https://placehold.co/40x40/cbd5e1/4b5563?text={d['team'][0].upper()}" # Placeholder with first letter of team
+    # Per ora, usiamo un'immagine segnaposto da placehold.co
+    logo_path = f"https://placehold.co/40x40/cbd5e1/4b5563?text={d['team'][0].upper()}" # Segnaposto con la prima lettera della squadra
 
-    # Create a card for each team with Tailwind CSS classes for styling
+    # Crea una card per ogni squadra con le classi Tailwind CSS per lo styling
     html += f"""
             <div class="team bg-white shadow-lg rounded-lg p-6 mb-4 transform transition-transform duration-300 hover:scale-105 hover:shadow-xl">
                 <div class="flex items-center mb-4">
@@ -88,18 +98,24 @@ for d in DATA:
                 </div>
                 <ul class="list-disc list-inside text-gray-600 space-y-2">
     """
-    # Add players to the list within the team card
-    for p in d["players"]:
-        html += f"""
-                    <li class="flex items-center">
-                        <svg class="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                        </svg>
-                        {p}
-                    </li>
+    # Aggiunge i giocatori alla lista all'interno della card della squadra
+    if d['players']:
+        for p in d["players"]:
+            html += f"""
+                        <li class="flex items-center">
+                            <svg class="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            {p}
+                        </li>
+            """
+    else:
+        html += """
+                    <li class="text-red-500">Nessun giocatore titolare trovato o errore nello scraping.</li>
         """
-    html += """
+    html += f"""
                 </ul>
+                <p class="text-xs text-gray-500 mt-4 text-right">Fonte: {d['source']}</p>
             </div>
     """
 
@@ -113,7 +129,7 @@ html += """
 </html>
 """
 
-# Write the generated HTML to the index.html file in the root directory
+# Scrive l'HTML generato nel file index.html nella directory principale
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html)
 
