@@ -4,35 +4,30 @@ import os
 from datetime import datetime
 
 # Lista delle squadre della Serie A 2025-2026
-# Questa lista è stata aggiornata per riflettere le squadre della prossima stagione,
-# basandosi sulle informazioni disponibili a Giugno 2025.
+# Questa lista è basata sulle promozioni e retrocessioni per la prossima stagione.
 TEAMS = [
     "Atalanta", "Bologna", "Cagliari", "Como", "Cremonese", "Fiorentina", "Genoa",
     "Inter", "Juventus", "Lazio", "Lecce", "Milan", "Napoli", "Parma", "Pisa",
-    "Roma", "Sassuolo", "Torino", "Udinese", "Verona" # "Verona" sta per Hellas Verona nei link di Fantacalcio.it
+    "Roma", "Sassuolo", "Torino", "Udinese", "Verona" # "Verona" si riferisce a Hellas Verona per gli URL
 ]
 
-SCRAPED_DATA = [] # Lista per memorizzare i dati delle formazioni
-
-print("Inizio scraping delle formazioni da Fantacalcio.it...")
-
-# --- Fonte di Scraping Primaria: Fantacalcio.it ---
-# Fantacalcio.it offre pagine dedicate per le probabili formazioni di ciascuna squadra,
-# il che lo rende una fonte relativamente stabile per lo scraping.
-for team_name_full in TEAMS:
+def scrape_fantacalcio_formations(team_name_full):
+    """
+    Scrapes probable formations for a single team from Fantacalcio.it.
+    Returns a dictionary with team, module, players, and source.
+    """
     try:
-        # Costruisce l'URL per la pagina delle probabili formazioni della squadra su Fantacalcio.it
-        # Sostituisce gli spazi con i trattini e converte in minuscolo per l'URL.
-        # Esempio: "Hellas Verona" -> "verona" per l'URL di Fantacalcio.it
-        url_team_segment = team_name_full.lower().replace(' ', '-').replace('hellas-', '') # Gestisce Hellas Verona
+        # Prepara il nome della squadra per l'URL di Fantacalcio.it
+        # Esempio: "Hellas Verona" diventa "verona" nell'URL
+        url_team_segment = team_name_full.lower().replace(' ', '-').replace('hellas-', '')
         url = f"https://www.fantacalcio.it/giocatori/probabili-formazioni/serie-a/{url_team_segment}"
-        print(f"Tentativo di scraping per: {team_name_full} da URL: {url}")
+        print(f"Tentativo di scraping per: {team_name_full} da URL: {url} (Fantacalcio.it)")
 
         r = requests.get(url)
         r.raise_for_status() # Genera un'eccezione per errori HTTP (es. 404, 500)
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # Estrae il modulo della formazione (es. 4-3-3)
+        # Estrae il modulo della formazione
         mod_element = soup.select_one(".formazioneHeader .modulo")
         modulo = mod_element.text.strip() if mod_element else "Modulo non disponibile"
 
@@ -40,27 +35,73 @@ for team_name_full in TEAMS:
         players_elements = soup.select(".formazione__lista li.titolare")
         players = [p.text.strip() for p in players_elements]
 
-        SCRAPED_DATA.append({"team": team_name_full, "modulo": modulo, "players": players, "source": "Fantacalcio.it"})
-        print(f"Dati per {team_name_full} raccolti con successo da Fantacalcio.it.")
+        print(f"  Debug: Modulo trovato per {team_name_full}: '{modulo}'")
+        print(f"  Debug: Giocatori trovati per {team_name_full} ({len(players)}): {players}")
+
+        return {"team": team_name_full, "modulo": modulo, "players": players, "source": "Fantacalcio.it"}
     except requests.exceptions.RequestException as e:
-        print(f"Errore HTTP/di connessione durante lo scraping per {team_name_full} da Fantacalcio.it: {e}")
-        SCRAPED_DATA.append({"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
+        print(f"Errore HTTP/di connessione per {team_name_full} (Fantacalcio.it): {e}")
+        return {"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"}
     except Exception as e:
-        print(f"Si è verificato un errore inatteso durante lo scraping per {team_name_full} da Fantacalcio.it: {e}")
-        SCRAPED_DATA.append({"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"})
+        print(f"Errore inatteso per {team_name_full} (Fantacalcio.it): {e}")
+        return {"team": team_name_full, "modulo": "Errore", "players": ["Dati non disponibili"], "source": "Fantacalcio.it (Errore)"}
 
-print("Scraping da Fantacalcio.it completato.")
+def scrape_tmw_serie_a_news():
+    """
+    Scrapes recent Serie A news headlines from TuttoMercatoWeb.com.
+    Returns a list of dictionaries with 'title' and 'link'.
+    """
+    news_items = []
+    url = "https://www.tuttomercatoweb.com/serie-a"
+    print(f"Tentativo di scraping notizie da TuttoMercatoWeb.com da URL: {url}")
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
 
-# --- CONSIDERAZIONI SULLO SCRAPING DA ALTRE FONTI (ES. SKY SPORT) ---
-# L'integrazione di fonti come Sky Sport per "la formazione più recente" è complessa
-# perché tali siti spesso non hanno pagine aggregate e stabili con tutte le probabili formazioni.
-# Le formazioni sono solitamente incluse in articoli specifici per singole partite o eventi,
-# e la loro struttura HTML può cambiare frequentemente.
-# Per una logica "la più recente da più fonti", sarebbe necessaria:
-# 1. Una funzione di scraping specifica per ogni sito (che gestisca la loro struttura unica).
-# 2. Una logica per identificare le partite della giornata corrente.
-# 3. Una logica di consolidamento e risoluzione dei conflitti basata su timestamp o priorità.
-# Questo script si concentra su una fonte stabile (Fantacalcio.it) per garantire robustezza.
+        # Seleziona i principali elementi delle notizie. Questo selettore potrebbe aver bisogno di aggiustamenti
+        # se la struttura del sito di TMW cambia.
+        # Cercare un div o una lista che contiene le notizie, poi gli <a> tag all'interno.
+        # Esempio: elementi <div> con classe 'news-item' o una struttura simile.
+        # Per TMW, spesso le notizie sono all'interno di <div class="tmw-list">, o <article>
+        # Proviamo a selezionare i link delle notizie principali nella sezione Serie A.
+        news_elements = soup.select('.tmw-list a[href*="/news/serie-a/"]') # Cerca link con 'news/serie-a/'
+        
+        # Prende solo i primi 5-7 titoli per evitare una lista troppo lunga
+        for i, news_item in enumerate(news_elements):
+            if i >= 7: # Limita a 7 notizie
+                break
+            title = news_item.get_text(strip=True)
+            link = news_item['href']
+            # Assicurati che il link sia assoluto
+            if not link.startswith('http'):
+                link = f"https://www.tuttomercatoweb.com{link}"
+            
+            if title and link:
+                news_items.append({"title": title, "link": link})
+        
+        print(f"Notizie raccolte da TuttoMercatoWeb.com: {len(news_items)} articoli.")
+        return news_items
+
+    except requests.exceptions.RequestException as e:
+        print(f"Errore HTTP/di connessione durante lo scraping delle notizie da TMW: {e}")
+        return []
+    except Exception as e:
+        print(f"Errore inatteso durante lo scraping delle notizie da TMW: {e}")
+        return []
+
+# --- Esecuzione dello Scraping ---
+SCRAPED_FORMATIONS = []
+print("Inizio scraping delle formazioni probabili...")
+for team in TEAMS:
+    formation_data = scrape_fantacalcio_formations(team)
+    SCRAPED_FORMATIONS.append(formation_data)
+print("Scraping formazioni completato.")
+
+SCRAPED_NEWS = []
+print("Inizio scraping delle ultime notizie dalla Serie A (TMW)...")
+SCRAPED_NEWS = scrape_tmw_serie_a_news()
+print("Scraping notizie completato.")
 
 
 # --- Generazione HTML ---
@@ -93,11 +134,16 @@ html = f"""<!DOCTYPE html>
             Probabili Formazioni Serie A 2025-2026
         </h1>
         <p class="text-center text-gray-600 text-sm mb-8">Ultimo aggiornamento: {current_datetime}</p>
+        
+        <!-- Sezione per le Formazioni delle Squadre -->
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 mt-10 text-center">
+            Formazioni Probabili (Fonte: Fantacalcio.it)
+        </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 """
 
-# Itera sui dati recuperati per generare la card HTML di ogni squadra
-for d in SCRAPED_DATA:
+# Itera sui dati delle formazioni recuperati per generare la card HTML di ogni squadra
+for d in SCRAPED_FORMATIONS:
     # IMPORTANTE: Sostituisci questo segnaposto con i percorsi reali dei tuoi loghi
     # Una volta che avrai la cartella 'logos' con i tuoi PNG delle squadre, usa:
     # Per esempio, per Juventus.png, il percorso sarebbe 'logos/juventus.png'
@@ -107,7 +153,6 @@ for d in SCRAPED_DATA:
     team_for_logo_filename = d['team'].lower().replace(' ', '-').replace('hellas-', '')
     # Se hai i tuoi loghi, decommenta la riga seguente e commenta quella sopra
     # logo_path = f"logos/{team_for_logo_filename}.png"
-
 
     # Crea una card per ogni squadra con le classi Tailwind CSS per lo styling
     html += f"""
@@ -133,17 +178,46 @@ for d in SCRAPED_DATA:
         html += """
                     <li class="text-red-500">Nessun giocatore titolare trovato o errore nello scraping.</li>
         """
-    html += f"""
+    html += """
                 </ul>
-                <p class="text-xs text-gray-500 mt-4 text-right">Fonte: {d['source']}</p>
             </div>
     """
 
 html += """
         </div>
+
+        <!-- Sezione per le Ultime Notizie (Fonte: TuttoMercatoWeb.com) -->
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 mt-10 text-center">
+            Ultime Notizie Serie A (Fonte: TuttoMercatoWeb.com)
+        </h2>
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-4">
+            <ul class="list-none space-y-3">
+    """
+
+# Aggiunge le notizie recuperate da TuttoMercatoWeb.com
+if SCRAPED_NEWS:
+    for news in SCRAPED_NEWS:
+        html += f"""
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-blue-500 mr-2 flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1.172a3.001 3.001 0 01-1.341-2.698zM12 16h.01" clip-rule="evenodd"></path>
+                    </svg>
+                    <a href="{news['link']}" target="_blank" rel="noopener noreferrer" class="text-blue-700 hover:underline text-lg font-medium">
+                        {news['title']}
+                    </a>
+                </li>
+        """
+else:
+    html += """
+                <li class="text-red-500">Nessuna notizia trovata o errore nello scraping da TuttoMercatoWeb.com.</li>
+    """
+
+html += """
+            </ul>
+        </div>
     </div>
     <footer class="mt-8 text-center text-gray-500 text-sm">
-        Dati forniti da Fantacalcio.it
+        Dati forniti da Fantacalcio.it e TuttoMercatoWeb.com
     </footer>
 </body>
 </html>
