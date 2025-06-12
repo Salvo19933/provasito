@@ -158,7 +158,7 @@ for d in SCRAPED_FORMATIONS:
                     <img src="{logo_path}" alt="{d['team']} logo" class="w-10 h-10 rounded-full mr-4 border-2 border-gray-200 object-contain">
                     <h2 class="text-2xl font-semibold text-gray-700">{d['team']} — {d['modulo']}</h2>
                 </div>
-                <ul class="list-none space-y-2"> {/* Changed to list-none for custom styling */}
+                <ul class="list-none space-y-2">
     """
     # Aggiunge i giocatori alla lista all'interno della card della squadra
     if d['players']:
@@ -169,9 +169,9 @@ for d in SCRAPED_FORMATIONS:
                             <img src="https://placehold.co/30x30/d1d5db/374151?text=⚽" alt="Player icon" class="w-8 h-8 rounded-full mr-3 border border-gray-300 object-contain">
                             <div>
                                 <p class="font-semibold text-gray-800 text-base">{p}</p>
-                                {/* Placeholder per Ruolo, Età, Nazionalità. Questi dati NON sono scrapati da Fantacalcio.it. */}
+                                # Placeholder per Ruolo, Età, Nazionalità. Questi dati NON sono scrapati da Fantacalcio.it.
                                 <p class="text-xs text-gray-500">Ruolo (es. Attaccante) | Età (N/D) | Nazionalità (N/D)</p>
-                                {/* <a href="#" class="text-blue-500 hover:underline text-xs">Vedi profilo</a> {/* Placeholder link */}
+                                # <a href="#" class="text-blue-500 hover:underline text-xs">Vedi profilo</a> # Placeholder link
                             </div>
                         </li>
             """
